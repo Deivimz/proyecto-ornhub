@@ -207,7 +207,15 @@ const DashboardPage: React.FC = () => {
 
   const handleAddModulo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.email) return;
+    if (!user) {
+      alert("Error: Debes iniciar sesión para publicar.");
+      return;
+    }
+    if (!user.email) {
+      alert("Error: Tu cuenta no tiene un correo electrónico asociado.");
+      return;
+    }
+
     const nuevo: Omit<Modulo, 'id'> = {
       titulo: modTitulo,
       imagen: modImagen,
@@ -227,8 +235,10 @@ const DashboardPage: React.FC = () => {
       setModTitulo('');
       setModImagen('');
       setModLink('');
-    } catch (err) {
+      alert("¡Video publicado con éxito!");
+    } catch (err: any) {
       console.error('Error añadiendo módulo:', err);
+      alert("Error al publicar: " + err.message + "\n\n(Probablemente tengas que cambiar las reglas de Firestore a modo prueba)");
     }
   };
 
