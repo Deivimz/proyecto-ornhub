@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { signOut, updateProfile } from 'firebase/auth';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Logo from '../components/Logo';
@@ -12,62 +13,14 @@ import type { Modulo } from '../types';
 
 const ADMIN_EMAIL = 'deivi@ornhub.com';
 const AUDIO_LIST = ['/audio/wanda.mp3', '/audio/Ricardo.mp3'];
-const STORAGE_KEY = 'modulosUsuario';
-
-const defaultModulos: Modulo[] = [
-  {
-    titulo: 'Tutorial de Firebase',
-    imagen: 'https://via.placeholder.com/300x180/ff9900/000000?text=Firebase',
-    link: '#',
-    autor: 'Admin',
-    autorEmail: 'deivi@ornhub.com',
-    views: 1240,
-    likes: 0,
-    dislikes: 0,
-    likedBy: [],
-    dislikedBy: [],
-    comments: [
-      {
-        text: '¡Excelente tutorial!',
-        user: 'Usuario1',
-        userEmail: 'user1@example.com',
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  },
-];
-
-const loadModulos = (): Modulo[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed: Modulo[] = JSON.parse(stored);
-      // Migración: asegurar que todos tienen los campos necesarios
-      return parsed.map((mod) => ({
-        ...mod,
-        likedBy: mod.likedBy || [],
-        dislikedBy: mod.dislikedBy || [],
-        comments: mod.comments || [],
-        likes: (mod.likedBy || []).length,
-        dislikes: (mod.dislikedBy || []).length,
-      }));
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return defaultModulos;
-};
-
-const saveModulos = (modulos: Modulo[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(modulos));
-};
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [modulos, setModulos] = useState<Modulo[]>(loadModulos);
-  const [activeModal, setActiveModal] = useState<number | null>(null);
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [activeModalId, setActiveModalId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Profile form state
   const [nuevoNombre, setNuevoNombre] = useState('');
@@ -90,10 +43,17 @@ const DashboardPage: React.FC = () => {
     }
   }, [user]);
 
-  // Save modulos to localStorage whenever they change
+  // Firebase Realtime Listener
   useEffect(() => {
-    saveModulos(modulos);
-  }, [modulos]);
+    const unsubscribe = onSnapshot(collection(db, 'modulos'), (snapshot) => {
+      const mods: Modulo[] = [];
+      snapshot.forEach((document) => {
+        mods.push({ id: document.id, ...document.data() } as Modulo);
+      });
+      setModulos(mods);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Click en avatar → audio aleatorio
   const handleAvatarClick = () => {
@@ -108,8 +68,7 @@ const DashboardPage: React.FC = () => {
   };
 
   // Cerrar modales de opciones al hacer clic fuera
-  const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
-  const handleWindowClick = () => setOpenMenuIndex(null);
+  const handleWindowClick = () => setOpenMenuId(null);
 
   useEffect(() => {
     window.addEventListener('click', handleWindowClick);
@@ -118,95 +77,99 @@ const DashboardPage: React.FC = () => {
 
   // ──── Handlers de módulos ────
 
-  const handleLike = (index: number) => {
-    if (!user) return;
-    setModulos((prev) => {
-      const updated = [...prev];
-      const mod = { ...updated[index] };
-      const email = user.email!;
+  const handleLike = async (id: string) => {
+    if (!user || !user.email) return;
+    const mod = modulos.find((m) => m.id === id);
+    if (!mod) return;
 
-      const likedIdx = mod.likedBy.indexOf(email);
-      const dislikedIdx = mod.dislikedBy.indexOf(email);
+    const email = user.email;
+    let newLikedBy = [...mod.likedBy];
+    let newDislikedBy = [...mod.dislikedBy];
 
-      if (likedIdx > -1) {
-        mod.likedBy = mod.likedBy.filter((e) => e !== email);
-      } else {
-        mod.likedBy = [...mod.likedBy, email];
-        if (dislikedIdx > -1) mod.dislikedBy = mod.dislikedBy.filter((e) => e !== email);
-      }
+    if (newLikedBy.includes(email)) {
+      newLikedBy = newLikedBy.filter((e) => e !== email);
+    } else {
+      newLikedBy.push(email);
+      newDislikedBy = newDislikedBy.filter((e) => e !== email);
+    }
 
-      mod.likes = mod.likedBy.length;
-      mod.dislikes = mod.dislikedBy.length;
-      updated[index] = mod;
-      return updated;
+    const modRef = doc(db, 'modulos', id);
+    await updateDoc(modRef, {
+      likedBy: newLikedBy,
+      dislikedBy: newDislikedBy,
+      likes: newLikedBy.length,
+      dislikes: newDislikedBy.length,
     });
   };
 
-  const handleDislike = (index: number) => {
-    if (!user) return;
-    setModulos((prev) => {
-      const updated = [...prev];
-      const mod = { ...updated[index] };
-      const email = user.email!;
+  const handleDislike = async (id: string) => {
+    if (!user || !user.email) return;
+    const mod = modulos.find((m) => m.id === id);
+    if (!mod) return;
 
-      const likedIdx = mod.likedBy.indexOf(email);
-      const dislikedIdx = mod.dislikedBy.indexOf(email);
+    const email = user.email;
+    let newLikedBy = [...mod.likedBy];
+    let newDislikedBy = [...mod.dislikedBy];
 
-      if (dislikedIdx > -1) {
-        mod.dislikedBy = mod.dislikedBy.filter((e) => e !== email);
-      } else {
-        mod.dislikedBy = [...mod.dislikedBy, email];
-        if (likedIdx > -1) mod.likedBy = mod.likedBy.filter((e) => e !== email);
-      }
+    if (newDislikedBy.includes(email)) {
+      newDislikedBy = newDislikedBy.filter((e) => e !== email);
+    } else {
+      newDislikedBy.push(email);
+      newLikedBy = newLikedBy.filter((e) => e !== email);
+    }
 
-      mod.likes = mod.likedBy.length;
-      mod.dislikes = mod.dislikedBy.length;
-      updated[index] = mod;
-      return updated;
+    const modRef = doc(db, 'modulos', id);
+    await updateDoc(modRef, {
+      likedBy: newLikedBy,
+      dislikedBy: newDislikedBy,
+      likes: newLikedBy.length,
+      dislikes: newDislikedBy.length,
     });
   };
 
-  const handleAddComment = (index: number, text: string) => {
-    if (!user || !text.trim()) return;
-    setModulos((prev) => {
-      const updated = [...prev];
-      const mod = { ...updated[index] };
-      mod.comments = [
-        ...mod.comments,
-        {
-          text,
-          user: user.displayName || 'Usuario Anónimo',
-          userEmail: user.email!,
-          timestamp: new Date().toISOString(),
-        },
-      ];
-      updated[index] = mod;
-      return updated;
+  const handleAddComment = async (id: string, text: string) => {
+    if (!user || !text.trim() || !user.email) return;
+    const mod = modulos.find((m) => m.id === id);
+    if (!mod) return;
+
+    const newComment = {
+      text,
+      user: user.displayName || 'Usuario Anónimo',
+      userEmail: user.email,
+      timestamp: new Date().toISOString(),
+    };
+
+    const modRef = doc(db, 'modulos', id);
+    await updateDoc(modRef, {
+      comments: [...mod.comments, newComment],
     });
   };
 
-  const handleDeleteComment = (moduleIndex: number, commentIndex: number) => {
-    setModulos((prev) => {
-      const updated = [...prev];
-      const mod = { ...updated[moduleIndex] };
-      mod.comments = mod.comments.filter((_, i) => i !== commentIndex);
-      updated[moduleIndex] = mod;
-      return updated;
+  const handleDeleteComment = async (id: string, commentIndex: number) => {
+    const mod = modulos.find((m) => m.id === id);
+    if (!mod) return;
+
+    const newComments = mod.comments.filter((_, i) => i !== commentIndex);
+    const modRef = doc(db, 'modulos', id);
+    await updateDoc(modRef, {
+      comments: newComments,
     });
   };
 
-  const handleOpenPlayer = (index: number) => {
-    setModulos((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], views: (updated[index].views || 0) + 1 };
-      return updated;
-    });
-    setActiveModal(index);
+  const handleOpenPlayer = async (id: string) => {
+    setActiveModalId(id);
+    const mod = modulos.find((m) => m.id === id);
+    if (mod) {
+      const modRef = doc(db, 'modulos', id);
+      await updateDoc(modRef, {
+        views: (mod.views || 0) + 1,
+      });
+    }
   };
 
-  const handleEliminarModulo = (index: number) => {
+  const handleEliminarModulo = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este contenido?')) {
-      setModulos((prev) => prev.filter((_, i) => i !== index));
+      await deleteDoc(doc(db, 'modulos', id));
     }
   };
 
@@ -242,15 +205,15 @@ const DashboardPage: React.FC = () => {
 
   // ──── Agregar Módulo ────
 
-  const handleAddModulo = (e: React.FormEvent) => {
+  const handleAddModulo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    const nuevo: Modulo = {
+    if (!user || !user.email) return;
+    const nuevo: Omit<Modulo, 'id'> = {
       titulo: modTitulo,
       imagen: modImagen,
       link: modLink,
       autor: user.displayName || 'Usuario Anon',
-      autorEmail: user.email!,
+      autorEmail: user.email,
       views: 0,
       likes: 0,
       dislikes: 0,
@@ -258,10 +221,15 @@ const DashboardPage: React.FC = () => {
       dislikedBy: [],
       comments: [],
     };
-    setModulos((prev) => [nuevo, ...prev]);
-    setModTitulo('');
-    setModImagen('');
-    setModLink('');
+    
+    try {
+      await addDoc(collection(db, 'modulos'), nuevo);
+      setModTitulo('');
+      setModImagen('');
+      setModLink('');
+    } catch (err) {
+      console.error('Error añadiendo módulo:', err);
+    }
   };
 
   const avatarSrc = user?.photoURL || `https://via.placeholder.com/36?text=U`;
@@ -416,32 +384,31 @@ const DashboardPage: React.FC = () => {
         {/* Grid de Módulos */}
         <div className="section-title">Módulos Destacados 🇨🇱</div>
         <section id="contenedorModulos" className="video-grid">
-          {modulos.map((mod, index) => {
+          {modulos.map((mod) => {
             const esDuenio = user && mod.autorEmail === user.email;
             const esAdmin = user && user.email === ADMIN_EMAIL;
             const canManage = esDuenio || esAdmin;
 
             return (
-              <div key={index} className="card">
+              <div key={mod.id} className="card">
                 {canManage && (
                   <div className="card-options">
                     <button
                       className="btn-dots"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenMenuIndex(openMenuIndex === index ? null : index);
+                        setOpenMenuId(openMenuId === mod.id ? null : mod.id!);
                       }}
                     >
                       ⋮
                     </button>
-                    {openMenuIndex === index && (
+                    {openMenuId === mod.id && (
                       <div className="options-menu" style={{ display: 'block' }}>
                         <button
                           className="btn-delete"
-                          data-index={index}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleEliminarModulo(index);
+                            if (mod.id) handleEliminarModulo(mod.id);
                           }}
                         >
                           Eliminar Contenido
@@ -451,7 +418,7 @@ const DashboardPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="card-thumbnail" onClick={() => handleOpenPlayer(index)}>
+                <div className="card-thumbnail" onClick={() => { if (mod.id) handleOpenPlayer(mod.id); }}>
                   <img src={mod.imagen} alt="Miniatura" />
                 </div>
 
@@ -462,7 +429,7 @@ const DashboardPage: React.FC = () => {
                     </span>
                     <span>👁 {mod.views || 0}</span>
                   </div>
-                  <div className="card-title" onClick={() => handleOpenPlayer(index)}>
+                  <div className="card-title" onClick={() => { if (mod.id) handleOpenPlayer(mod.id); }}>
                     {mod.titulo}
                   </div>
                 </div>
@@ -473,13 +440,13 @@ const DashboardPage: React.FC = () => {
       </main>
 
       {/* Modal Reproductor */}
-      {activeModal !== null && (
+      {activeModalId !== null && (
         <VideoModal
-          modulo={modulos[activeModal]}
-          moduloIndex={activeModal}
+          modulo={modulos.find((m) => m.id === activeModalId)!}
+          moduloId={activeModalId}
           userEmail={user?.email || null}
           userName={user?.displayName || null}
-          onClose={() => setActiveModal(null)}
+          onClose={() => setActiveModalId(null)}
           onLike={handleLike}
           onDislike={handleDislike}
           onAddComment={handleAddComment}

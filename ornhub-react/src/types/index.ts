@@ -8,6 +8,7 @@ export interface Comment {
 }
 
 export interface Modulo {
+  id?: string;
   titulo: string;
   imagen: string;
   link: string;

@@ -147,7 +147,7 @@ ornhub-react/                    ← Nuevo proyecto dentro de la carpeta actual
 
 ## 📝 Notas Importantes
 
-- El proyecto NO usa Firestore; toda la data de módulos va a `localStorage`
+- El proyecto AHORA usa Firestore para la base de datos de módulos en tiempo real.
 - Los archivos de audio se sirven desde `/audio/` (public folder de Vite)
 - Los `window.handleLike`, `window.handleDislike`, etc. serán reemplazados por props/callbacks en React
 - Los `innerHTML` dinámicos serán reemplazados por JSX reactivo con estado
@@ -165,9 +165,9 @@ ornhub-react/                    ← Nuevo proyecto dentro de la carpeta actual
 ### Subida a GitHub
 - [x] Inicializar Git en la carpeta raíz `ornhub-react/`.
 - [x] Hacer el primer commit con el proyecto finalizado.
-- [ ] Subir el repositorio a GitHub.
+- [x] Subir el repositorio a GitHub.
 
 ### Despliegue (Deploy) en Netlify
-- [ ] Conectar el repositorio de GitHub a Netlify.
-- [ ] Configurar el comando de build (`npm run build`) y el directorio de publicación (`dist/`).
-- [ ] Verificar que la aplicación en vivo funcione correctamente.
+- [x] Conectar el repositorio de GitHub a Netlify.
+- [x] Configurar el comando de build (`npm run build`) y el directorio de publicación (`dist/`).
+- [x] Verificar que la aplicación en vivo funcione correctamente.
