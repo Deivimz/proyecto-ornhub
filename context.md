@@ -171,3 +171,32 @@ ornhub-react/                    ← Nuevo proyecto dentro de la carpeta actual
 - [x] Conectar el repositorio de GitHub a Netlify.
 - [x] Configurar el comando de build (`npm run build`) y el directorio de publicación (`dist/`).
 - [x] Verificar que la aplicación en vivo funcione correctamente.
+
+---
+
+## 🍪 Fase 8 — Mejoras de Sesión y Errores (Solicitadas)
+
+### 1. Gestión de Sesión con Cookies
+- Instalar `js-cookie` (y sus tipos `@types/js-cookie`).
+- Modificar `AuthContext.tsx` para sincronizar la sesión (`user.uid` o `token`) en una cookie.
+- Al hacer login, guardar la cookie. Al hacer logout (en `Dashboard.tsx`), eliminar la cookie por completo.
+- Rehidratación inmediata: El `AuthContext` debe inicializarse leyendo la cookie para evitar el parpadeo de carga (`loading`).
+
+### 2. Guards de Rutas (Protected/Public Routes)
+- `ProtectedRoute.tsx` y `PublicRoute.tsx` deben verificar tanto el `AuthContext` como la existencia de la cookie de sesión.
+- Si no hay sesión (ni en Context ni en cookie), `ProtectedRoute` redirige a `/login`.
+- Si hay sesión, `PublicRoute` redirige a `/dashboard`.
+
+### 3. Mapeo de Errores Estricto
+- Centralizar o actualizar las funciones de mapeo de errores (`mapearError`) para cumplir estrictamente con los textos solicitados:
+  - `auth/invalid-email` → "El correo no es válido."
+  - `auth/user-not-found` → "No existe una cuenta con ese correo."
+  - `auth/wrong-password` → "Contraseña incorrecta."
+  - `auth/invalid-credential` → "Correo o contraseña incorrectos."
+  - `auth/email-already-in-use` → "Ya existe una cuenta con ese correo."
+  - `auth/weak-password` → "La contraseña es demasiado débil (mínimo 6 caracteres)."
+  - `auth/cancelled-popup-request` → "Cerraste la ventana de Google antes de completar."
+  - `auth/network-request-failed` → "Error de red. Verifica tu conexión."
+  - `auth/too-many-requests` → "Demasiados intentos. Espera unos minutos."
+- Agregar manejo de error de inicialización en `firebase/config.ts`: "Firebase no está configurado. Revisa firebaseconfig.js."
+

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { signOut, updateProfile } from 'firebase/auth';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import { auth, db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -197,6 +198,7 @@ const DashboardPage: React.FC = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      Cookies.remove('auth_session');
       navigate('/login', { replace: true });
     } catch (err) {
       console.error('Error al cerrar sesión:', err);

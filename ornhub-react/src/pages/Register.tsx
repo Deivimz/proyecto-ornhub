@@ -7,20 +7,7 @@ import { auth } from '../firebase/config';
 import Logo from '../components/Logo';
 import PublicRoute from '../components/PublicRoute';
 
-const mapearError = (code: string): string => {
-  switch (code) {
-    case 'auth/invalid-email':
-      return 'El correo no es válido.';
-    case 'auth/email-already-in-use':
-      return 'Ya existe una cuenta con ese correo.';
-    case 'auth/weak-password':
-      return 'La contraseña es demasiado débil (mínimo 6 caracteres).';
-    case 'auth/network-request-failed':
-      return 'Error de red. Verifica tu conexión.';
-    default:
-      return 'Ocurrió un error inesperado al registrarse.';
-  }
-};
+import { mapearError } from '../utils/errorMapper';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
