@@ -163,8 +163,8 @@ ornhub-react/                    ← Nuevo proyecto dentro de la carpeta actual
 - [x] Asegurarnos de que el `.gitignore` de `ornhub-react/` esté correcto antes del push.
 
 ### Subida a GitHub
-- [ ] Inicializar Git en la carpeta raíz `ornhub-react/`.
-- [ ] Hacer el primer commit con el proyecto finalizado.
+- [x] Inicializar Git en la carpeta raíz `ornhub-react/`.
+- [x] Hacer el primer commit con el proyecto finalizado.
 - [ ] Subir el repositorio a GitHub.
 
 ### Despliegue (Deploy) en Netlify
